@@ -7,14 +7,49 @@ let todos = [
   { id: 2, task: 'Build CRUD API', completed: false },
 ];
 
+// Track the next id independently so deletes don't cause id collisions
+let nextId = 3;
+
 // GET All – Read
 app.get('/todos', (req, res) => {
   res.status(200).json(todos); // Send array as JSON
 });
 
-// POST New – Create
+// GET Active – Array bonus: only todos that are NOT completed.
+// NOTE: declared before '/todos/:id' so "active" isn't treated as an :id.
+app.get('/todos/active', (req, res) => {
+  const active = todos.filter((t) => !t.completed);
+  res.status(200).json(active);
+});
+
+// GET Completed – filter completed todos
+app.get('/todos/completed', (req, res) => {
+  const completed = todos.filter((t) => t.completed);
+  res.status(200).json(completed); // Custom Read!
+});
+
+// GET One – Single read by id
+app.get('/todos/:id', (req, res) => {
+  const todo = todos.find((t) => t.id === parseInt(req.params.id));
+  if (!todo) return res.status(404).json({ error: 'Todo not found' });
+  res.status(200).json(todo);
+});
+
+// POST New – Create (validation: "task" field is required)
 app.post('/todos', (req, res) => {
-  const newTodo = { id: todos.length + 1, ...req.body }; // Auto-ID
+  const { task, completed } = req.body || {};
+
+  if (!task || typeof task !== 'string' || task.trim() === '') {
+    return res
+      .status(400)
+      .json({ error: 'Validation failed: "task" field is required.' });
+  }
+
+  const newTodo = {
+    id: nextId++,
+    task: task.trim(),
+    completed: Boolean(completed), // defaults to false
+  };
   todos.push(newTodo);
   res.status(201).json(newTodo); // Echo back
 });
@@ -22,7 +57,7 @@ app.post('/todos', (req, res) => {
 // PATCH Update – Partial
 app.patch('/todos/:id', (req, res) => {
   const todo = todos.find((t) => t.id === parseInt(req.params.id)); // Array.find()
-  if (!todo) return res.status(404).json({ message: 'Todo not found' });
+  if (!todo) return res.status(404).json({ error: 'Todo not found' });
   Object.assign(todo, req.body); // Merge: e.g., {completed: true}
   res.status(200).json(todo);
 });
@@ -37,14 +72,10 @@ app.delete('/todos/:id', (req, res) => {
   res.status(204).send(); // Silent success
 });
 
-app.get('/todos/completed', (req, res) => {
-  const completed = todos.filter((t) => t.completed);
-  res.json(completed); // Custom Read!
-});
-
+// Error-handling middleware
 app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Server error!' });
 });
 
-const PORT = 3002;
+const PORT = process.env.PORT || 3002;
 app.listen(PORT, () => console.log(`Server on port ${PORT}`));
